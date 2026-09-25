@@ -1,0 +1,6 @@
+{
+  "name": "Dress Sense – AI Weather Advisor",
+  "description": "An explainable AI weather advisor that reads live weather for your city and gives you a complete outfit with example clothing images and the reason behind every suggestion.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": []
+}
