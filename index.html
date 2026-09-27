@@ -11,23 +11,31 @@
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header><div class="w"><nav><a class="brand" href="#advisor"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h2a1 1 0 0 0 2 0h2l1 3-2.5 1.5L15 20H9l1.5-12.5L8 6Z"/><path d="M5 8 2 9.5 3.5 13 6 12"/><path d="M19 8l3 1.5L20.5 13 18 12"/></svg></span><b>Dress Sense</b></a><div><a href="#advisor">Advisor</a><a href="#how">How it works</a><a href="#rules">Rules</a><a href="#security">Security</a><a href="#about">About</a><a href="#faq">FAQ</a></div></nav></div></header>
+<header><div class="w"><nav><a class="brand" href="#advisor"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h2a1 1 0 0 0 2 0h2l1 3-2.5 1.5L15 20H9l1.5-12.5L8 6Z"/><path d="M5 8 2 9.5 3.5 13 6 12"/><path d="M19 8l3 1.5L20.5 13 18 12"/></svg></span><b>Dress Sense</b></a><div><a href="#advisor">Advisor</a><a href="#how">How it works</a><a href="#rules">Rules</a><a href="#security">Security</a><a href="#about">About</a><a href="#faq">FAQ</a><a href="/Dress_Sense_Project_Report.pdf" target="_blank" download="Dress_Sense_Project_Report.pdf" style="color:var(--sun);font-weight:700">📄 PDF Report</a></div></nav></div></header>
 
 <section class="hero" id="advisor" data-sky="clear"><svg class="hills" viewBox="0 0 1000 70" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40C150 5 320 60 520 32S850 8 1000 38V70H0Z"/></svg><div class="w">
 <h1>What should you wear today?</h1>
 <p class="sub">Dress Sense reads live weather for your city and gives you a complete outfit, with the reason behind every suggestion.</p>
 <div class="panel">
   <div><label for="city">City</label><input id="city" maxlength="60" placeholder="e.g. Mumbai" autocomplete="off"></div>
+  <div><label for="gender">Gender</label><select id="gender"><option value="male">Male</option><option value="female">Female</option></select></div>
   <div><label for="act">Today I'm going for</label><select id="act"><option value="casual">College / casual</option><option value="office">Office / formal</option><option value="workout">Workout / sports</option><option value="travel">Travel / long commute</option></select></div>
-  <div><label for="sens">I usually feel</label><select id="sens"><option value="0">Normal</option><option value="-3">Cold easily</option><option value="3">Hot easily</option></select></div>
+  <div><label for="sens">I usually feel</label><select id="sens"><option value="0">Normal</option><option value="-5">Cold easily</option><option value="5">Hot easily</option></select></div>
   <button id="go">Get advice</button>
 </div>
-<div class="row2"><button class="alt" id="loc">Use my location</button><button class="alt" id="unit">Switch to °F</button><button class="alt" id="vibeToggle">Vibe: Gen Z 😎</button></div>
+<div class="row2"><button class="alt" id="loc">Use my location</button><button class="alt" id="unit">Switch to °F</button><button class="alt" id="genderToggle">Gender: Male 👨</button><button class="alt" id="vibeToggle">Vibe: Gen Z 😎</button></div>
 <div id="status" role="status" aria-live="polite"></div>
 <div id="out" class="hide">
   <div class="grid">
     <div class="card"><div id="place"></div><div class="temp" id="temp"></div><div class="cond" id="cond"></div><div class="stats" id="stats"></div>
-      <div class="score"><span>Weather Comfort</span><div class="bar"><i id="bar"></i></div><b id="sc"></b></div></div>
+      <div class="score">
+        <div class="score-top">
+          <span>Outdoor Weather Comfort</span>
+          <b id="sc"></b>
+        </div>
+        <div class="bar"><i id="bar"></i></div>
+        <div class="score-sub" id="scoreSub">Measures raw ambient climate; outfit is chosen to maximize your comfort.</div>
+      </div></div>
     <div class="tag">
       <div class="tag-header">
         <h3 id="fitTitle">Wear this today</h3>
@@ -67,16 +75,16 @@
 <section class="s" id="rules"><div class="w">
 <h2>The recommendation rules</h2><p class="lead">The engine is a rule-based expert system. It maps the adjusted feels-like temperature to a base outfit, then adds extras for rain, UV, wind and humidity.</p>
 <div class="tw"><table>
-<tr><th>Feels like</th><th>Top</th><th>Bottom</th><th>Extras</th></tr>
-<tr><td>32°C and above</td><td>Light cotton or linen tee</td><td>Shorts or thin trousers</td><td>Sandals, hydration</td></tr>
-<tr><td>27 to 31°C</td><td>Cotton t-shirt</td><td>Light trousers</td><td>Sneakers</td></tr>
-<tr><td>20 to 26°C</td><td>Tee with thin overshirt</td><td>Jeans or chinos</td><td>Sneakers</td></tr>
-<tr><td>14 to 19°C</td><td>Full sleeve with light jacket</td><td>Jeans</td><td>Closed shoes</td></tr>
-<tr><td>8 to 13°C</td><td>Sweater with warm jacket</td><td>Lined trousers</td><td>Scarf</td></tr>
-<tr><td>Below 8°C</td><td>Thermal, sweater, heavy coat</td><td>Thermal-lined trousers</td><td>Beanie, gloves, boots</td></tr>
+<tr><th>Feels like</th><th>Women's Wardrobe 👩</th><th>Men's Wardrobe 👨</th><th>Extras</th></tr>
+<tr><td>32°C and above</td><td>Linen midi sundress / tunic & wide-leg bottoms</td><td>Light cotton or linen tee & shorts</td><td>Sandals, hydration</td></tr>
+<tr><td>27 to 31°C</td><td>Pastel cotton top / baby tee & wide-leg denim</td><td>Cotton t-shirt & light trousers</td><td>Sneakers</td></tr>
+<tr><td>20 to 26°C</td><td>Ribbed knit cardigan & baby tee with high-waisted jeans</td><td>Tee with thin overshirt & jeans/chinos</td><td>Sneakers</td></tr>
+<tr><td>14 to 19°C</td><td>Cropped bomber or denim jacket with wide-leg jeans</td><td>Full sleeve with light jacket & jeans</td><td>Closed shoes</td></tr>
+<tr><td>8 to 13°C</td><td>Chunky knit sweater & tailored trousers</td><td>Sweater with warm jacket & lined trousers</td><td>Scarf, ankle boots</td></tr>
+<tr><td>Below 8°C</td><td>Thermal base, puffer coat & lined trousers</td><td>Thermal, sweater, heavy coat & lined trousers</td><td>Beanie, gloves, boots</td></tr>
 </table></div>
 <div class="two mt20">
-<div><b>Adjustments</b><ul><li>College / campus: balanced casual shirts & oversized tees with relaxed denim/trousers & sneakers</li><li>Travel / commute: balanced oversized tees & transit overshirts with comfortable travel pants</li><li>Workout: +5° heat adjustment, moisture-wicking dry-fit tee & athletic gym shorts</li><li>Office: crisp plain formal dress shirts, tailored trousers & penny loafers</li><li>Comfort bias: -3° or +3° for cold or hot sensitivity</li></ul></div>
+<div><b>Adjustments</b><ul><li>Wardrobe selector: dedicated Women's (cardigans, linen midi dresses, silk blouses, high-waisted wide denim, yoga leggings) and Men's outfits</li><li>College / campus: balanced campus aesthetics tailored to gender and mode</li><li>Travel / commute: cabin-ready layered tops with relaxed travel trousers or wide denim</li><li>Workout: +5° heat adjustment, moisture-wicking activewear sets, leggings or gym shorts</li><li>Office: ivory silk blouses & blazers (Women) or crisp formal dress shirts (Men) with tailored trousers & loafers</li></ul></div>
 <div><b>Add-ons</b><ul><li>Rain chance 30% or more: umbrella. 60% or more: raincoat too</li><li>UV index 6 or more: sunglasses, cap, sunscreen</li><li>Wind 30 km/h or more: windbreaker</li></ul></div>
 </div></div></section>
 
@@ -99,7 +107,18 @@
 <div><b>Future scope</b><ul><li>Train a decision-tree model on user feedback</li><li>Wardrobe inventory and hourly forecasts</li><li>LLM-written advice and offline PWA mode</li></ul>
 <b>Team</b><ul><li>Your name (Team lead)</li><li>Member two</li><li>Member three</li></ul>
 <span class="note">Department of Computer Science and Engineering. Edit the names above in index.html.</span></div>
-</div></div></section>
+</div>
+<div class="report-box mt20" style="background:var(--card);border:2px solid var(--acc);border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-top:24px">
+  <div>
+    <h3 style="margin:0 0 4px;font-size:1.1rem;display:flex;align-items:center;gap:8px">📄 Project Technical & Architectural Report (PDF)</h3>
+    <p style="margin:0;color:var(--mut);font-size:.88rem">Download the complete summary report covering system architecture, dual aesthetic styling, climate comfort formulation, and activity protocols.</p>
+  </div>
+  <a href="/Dress_Sense_Project_Report.pdf" download="Dress_Sense_Project_Report.pdf" target="_blank" class="btn" style="background:var(--acc);color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:700;display:inline-flex;align-items:center;gap:8px">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    Download PDF Report
+  </a>
+</div>
+</div></section>
 
 <section class="s" id="faq"><div class="w">
 <h2>Frequently asked questions</h2>
@@ -107,7 +126,8 @@
 <details><summary>Where does the weather data come from?</summary><p>Open-Meteo, a free open weather service that needs no API key.</p></details>
 <details><summary>Does the site store my location?</summary><p>No. Your coordinates are used only to request the forecast. The last city name is kept in your own browser.</p></details>
 <details><summary>Why does "Use my location" not work?</summary><p>Browsers may block location on files opened directly. Run a local server (python -m http.server 8000) or host the site on HTTPS, such as GitHub Pages.</p></details>
-<details><summary>What is the "Vibe: Gen Z" button?</summary><p>It swaps the outfit labels between a slangy style ("kicks", "denim", "cozycore fit") and plain descriptions ("sneakers", "jeans", "sweater with a warm jacket"). The underlying recommendation and reasons are identical either way, so it's presentation only, not a different rule set.</p></details>
+<details><summary>What is the difference between Gen Z Mode and Classic Plain Mode?</summary><p>Gen Z Mode recommends trendy streetwear aesthetics (oversized graphic tees, baggy relaxed denim, chunky kicks, boxy fleece hoodies) with youth-culture vibe captions. Classic Plain Mode recommends timeless staples (clean oxford button-downs, tailored chinos, classic sneakers, cable-knit sweaters) with objective stylist guidance.</p></details>
+<details><summary>How is the Outdoor Weather Comfort Score calculated?</summary><p>It starts at 100 and deducts 3 points for every degree away from 22°C (the physiological thermal baseline), plus penalties for heavy rain (15 pts), extreme UV (8 pts), and harsh winds (10 pts). A lower score indicates severe ambient weather rather than inadequate clothing.</p></details>
 </div></section>
 
 <footer><div class="w">Dress Sense · College project · Weather data by Open-Meteo</div></footer>
