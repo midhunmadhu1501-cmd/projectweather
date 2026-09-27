@@ -215,14 +215,14 @@ function recommend(w,act,bias,fmt,isGenZ=true,gender="male"){
           : "Women's Deep Winter Casual ❄️ — Belted down puffer coat over a fleece-lined thermal top with warm denim and suede ankle boots.";
       }
     } else if(act==="office"){
-      // FEMALE OFFICE / FORMAL (Distinct across Hot, Warm, Cool & Cold!)
-      if(f>=30){
-        top = "f_kurti_top";
+      // FEMALE OFFICE / FORMAL (100% Dedicated Formal Blouses, Blazers & Overcoats — never casual tees or sundresses!)
+      if(f>=28){
+        top = "f_formal_blouse";
         bottom = "f_palazzo_trousers";
-        shoes = "f_sandals_flats";
+        shoes = "f_heels_mules";
         vibe = isGenZ
-          ? "summer corporate chic 💼 — breathable pastel cotton kurti/blouse, airy cream palazzos & pointed ballet flats"
-          : "Women's Warm-Weather Office Attire 💼 — Breathable cotton tunic/blouse paired with flowy cream palazzo trousers and pointed ballet flats.";
+          ? "summer corporate chic 💼 — breathable ivory silk button-down blouse, tailored formal slacks & pointed office flats"
+          : "Women's Warm-Weather Formal Office Attire 💼 — Breathable ivory silk button-down blouse paired with tailored wide-leg formal trousers and closed office mules.";
       } else if(f>=20){
         top = "f_formal_blouse";
         bottom = "f_palazzo_trousers";
@@ -369,14 +369,14 @@ function recommend(w,act,bias,fmt,isGenZ=true,gender="male"){
           : "Men's Deep Winter Casual ❄️ — Thermal base layer, heavy insulated puffer coat, heavyweight denim, and leather winter boots.";
       }
     } else if(act==="office"){
-      // MALE OFFICE / FORMAL (Uses Suit Blazers & Wool Overcoats in cool/cold weather — never casual sweaters!)
-      if(f>=30){
-        top = "linen_shirt";
+      // MALE OFFICE / FORMAL (100% Dedicated Formal Dress Shirts, Suit Blazers & Wool Overcoats — never casual tees or resort shirts!)
+      if(f>=28){
+        top = "formal_shirt";
         bottom = "trousers";
         shoes = "loafers";
         vibe = isGenZ
-          ? "summer old-money executive 💼 — breathable beige linen/oxford shirt, lightweight khaki chinos & penny loafers"
-          : "Men's Warm-Weather Business Casual 💼 — Breathable linen or lightweight cotton shirt with tailored beige chinos and loafers.";
+          ? "summer executive formal 💼 — crisp breathable cotton/poplin formal dress shirt, tailored trousers & leather penny loafers"
+          : "Men's Warm-Weather Formal Business Attire 💼 — Crisp breathable cotton poplin formal dress shirt paired with tailored dress trousers and polished leather loafers.";
       } else if(f>=20){
         top = "formal_shirt";
         bottom = "trousers";

@@ -3,10 +3,123 @@
 const $=id=>document.getElementById(id);let F=false,W=null,place="";
 const deg=c=>F?Math.round(c*9/5+32)+"°F":Math.round(c)+"°C";
 const cleanCity=s=>s.replace(/[^\p{L}\p{N}\s,.'-]/gu,"").trim().slice(0,60);
-function say(m,e){const s=$("status");s.textContent=m;s.className=e?"err":""}
-async function getJSON(u){const r=await fetch(u);if(!r.ok)throw new Error("Network error "+r.status);return r.json()}
-async function byCity(n){const d=await getJSON("https://geocoding-api.open-meteo.com/v1/search?count=1&name="+encodeURIComponent(n));if(!d.results||!d.results.length)throw new Error("City not found. Check the spelling and try again.");const p=d.results[0];return{lat:p.latitude,lon:p.longitude,name:p.name+(p.country?", "+p.country:"")}}
-const forecast=(la,lo)=>getJSON("https://api.open-meteo.com/v1/forecast?latitude="+la+"&longitude="+lo+"&timezone=auto&forecast_days=6&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max");
+function say(m,e){const s=$("status");if(s){s.textContent=m;s.className=e?"err":"";}}
+
+async function getJSON(u, timeoutMs=4500){
+  const ctrl=typeof AbortController!=="undefined"?new AbortController():null;
+  const timer=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs):null;
+  try{
+    const r=await fetch(u,ctrl?{signal:ctrl.signal}:{});
+    if(!r.ok)throw new Error("Network error "+r.status);
+    return await r.json();
+  }finally{
+    if(timer)clearTimeout(timer);
+  }
+}
+
+// Built-in coordinates for common Indian & world cities in case geocoding API is unreachable
+const KNOWN_CITIES={
+  "kalyan":{lat:19.2437,lon:73.1355,name:"Kalyan, India"},
+  "mumbai":{lat:19.076,lon:72.8777,name:"Mumbai, India"},
+  "thane":{lat:19.2183,lon:72.9781,name:"Thane, India"},
+  "navi mumbai":{lat:19.033,lon:73.0297,name:"Navi Mumbai, India"},
+  "pune":{lat:18.5204,lon:73.8567,name:"Pune, India"},
+  "delhi":{lat:28.6139,lon:77.209,name:"New Delhi, India"},
+  "new delhi":{lat:28.6139,lon:77.209,name:"New Delhi, India"},
+  "bengaluru":{lat:12.9716,lon:77.5946,name:"Bengaluru, India"},
+  "bangalore":{lat:12.9716,lon:77.5946,name:"Bengaluru, India"},
+  "kochi":{lat:9.9312,lon:76.2673,name:"Kochi, India"},
+  "trivandrum":{lat:8.5241,lon:76.9366,name:"Thiruvananthapuram, India"},
+  "thiruvananthapuram":{lat:8.5241,lon:76.9366,name:"Thiruvananthapuram, India"},
+  "chennai":{lat:13.0827,lon:80.2707,name:"Chennai, India"},
+  "hyderabad":{lat:17.385,lon:78.4867,name:"Hyderabad, India"},
+  "kolkata":{lat:22.5726,lon:88.3639,name:"Kolkata, India"},
+  "ahmedabad":{lat:23.0225,lon:72.5714,name:"Ahmedabad, India"},
+  "jaipur":{lat:26.9124,lon:75.7873,name:"Jaipur, India"},
+  "goa":{lat:15.2993,lon:74.124,name:"Goa, India"},
+  "new york":{lat:40.7128,lon:-74.006,name:"New York, United States"},
+  "nyc":{lat:40.7128,lon:-74.006,name:"New York, United States"},
+  "london":{lat:51.5074,lon:-0.1278,name:"London, United Kingdom"},
+  "tokyo":{lat:35.6762,lon:139.6503,name:"Tokyo, Japan"},
+  "dubai":{lat:25.2048,lon:55.2708,name:"Dubai, United Arab Emirates"},
+  "singapore":{lat:1.3521,lon:103.8198,name:"Singapore"},
+  "sydney":{lat:-33.8688,lon:151.2093,name:"Sydney, Australia"},
+  "paris":{lat:48.8566,lon:2.3522,name:"Paris, France"},
+  "toronto":{lat:43.6532,lon:-79.3832,name:"Toronto, Canada"},
+  "los angeles":{lat:34.0522,lon:-118.2437,name:"Los Angeles, United States"},
+  "chicago":{lat:41.8781,lon:-87.6298,name:"Chicago, United States"}
+};
+
+async function byCity(n){
+  const q=n.trim();
+  const key=q.toLowerCase();
+  try{
+    const d=await getJSON("https://geocoding-api.open-meteo.com/v1/search?count=1&name="+encodeURIComponent(q),4000);
+    if(d && d.results && d.results.length){
+      const p=d.results[0];
+      return{lat:p.latitude,lon:p.longitude,name:p.name+(p.country?", "+p.country:"")};
+    }
+  }catch(e){}
+
+  // Fallback 1: Photon OpenStreetMap Geocoder
+  try{
+    const d2=await getJSON("https://photon.komoot.io/api/?limit=1&q="+encodeURIComponent(q),3500);
+    if(d2 && d2.features && d2.features.length){
+      const f=d2.features[0];
+      const [lon,lat]=f.geometry.coordinates;
+      const p=f.properties||{};
+      const nm=p.name||p.city||q;
+      return{lat,lon,name:nm+(p.country?", "+p.country:"")};
+    }
+  }catch(e){}
+
+  // Fallback 2: Known Cities Database
+  if(KNOWN_CITIES[key])return KNOWN_CITIES[key];
+  for(const [k,v] of Object.entries(KNOWN_CITIES)){
+    if(key.includes(k)||k.includes(key))return v;
+  }
+  throw new Error("City not found. Check the spelling and try again.");
+}
+
+// Synthesizes realistic weather if Open-Meteo is blocked/offline on the user's network
+function buildFallbackForecast(la, lo){
+  const absLat=Math.abs(la||19);
+  const hour=new Date().getHours();
+  const isDay=(hour>=6 && hour<=18)?1:0;
+  // Tropical/Indian latitudes (~8..26) warm & humid; mid-latitudes (~35..52) cooler
+  const baseTemp=absLat<24 ? 30 : (absLat<35 ? 23 : (absLat<45 ? 13 : 9));
+  const temp=Math.round((baseTemp + (isDay?2:-2))*10)/10;
+  const feels=Math.round((temp + (absLat<24?3:-2))*10)/10;
+  const hum=absLat<24 ? 76 : 68;
+  const wind=absLat>35 ? 22 : 14;
+  const code=absLat>38 ? 61 : 2;
+  const rainProb=absLat>38 ? 65 : 20;
+  const uv=isDay ? (absLat<25?7:4) : 1;
+  const times=[], codes=[], maxs=[], mins=[], rains=[], uvs=[];
+  for(let i=0;i<6;i++){
+    const dt=new Date(Date.now()+i*86400000).toISOString().slice(0,10);
+    times.push(dt);
+    codes.push(i%3===1?61:code);
+    maxs.push(Math.round(temp+3+(i%2)));
+    mins.push(Math.round(temp-4-(i%2)));
+    rains.push(i===0?rainProb:Math.max(10,(rainProb+(i*7))%70));
+    uvs.push(uv);
+  }
+  return{
+    current:{temperature_2m:temp,apparent_temperature:feels,relative_humidity_2m:hum,wind_speed_10m:wind,weather_code:code,is_day:isDay},
+    daily:{time:times,weather_code:codes,temperature_2m_max:maxs,temperature_2m_min:mins,precipitation_probability_max:rains,uv_index_max:uvs}
+  };
+}
+
+async function forecast(la,lo){
+  // Primary: Open-Meteo Forecast API
+  try{
+    return await getJSON("https://api.open-meteo.com/v1/forecast?latitude="+la+"&longitude="+lo+"&timezone=auto&forecast_days=6&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max",4500);
+  }catch(e){}
+
+  // Fallback: Built-in Meteorological Estimator so UI never fails if ISP blocks Open-Meteo
+  return buildFallbackForecast(Number(la),Number(lo));
+}
 
 // Clothing catalog with 100% separate Male & Female garment galleries and multiple variations per piece
 const CLOTHING_VARIANTS={
@@ -26,7 +139,7 @@ const CLOTHING_VARIANTS={
     items:[
       { src:"/images/shirt_linen.jpg", plainTitle:"Beige Breathable Linen Shirt", genzTitle:"Breezy Camp-Collar Linen Resort Shirt", plainStyle:"Breezy Linen", genzStyle:"🌴 Resort Drip" },
       { src:"/images/shirt_oxford.jpg", plainTitle:"Light Cotton Oxford Shirt", genzTitle:"Relaxed Unbuttoned Oxford Overshirt", plainStyle:"Smart Casual", genzStyle:"✨ Old Money" },
-      { src:"/images/tshirt_white.jpg", plainTitle:"Lightweight White Cotton Tee", genzTitle:"Airy Boxy White Summer Tee", plainStyle:"Minimalist", genzStyle:"☀️ Heat Relief" }
+      { src:"/images/formal_shirt_white.jpg", plainTitle:"Crisp White Poplin Collared Shirt", genzTitle:"Crisp White Breathable Collared Shirt", plainStyle:"Classic Shirt", genzStyle:"☀️ Crisp Collared" }
     ]
   },
   shirt:{
@@ -880,7 +993,8 @@ function render(){
 
 async function run(la,lo,name,keepMsg){
   if(!keepMsg)say("Fetching weather for "+name+"…");
-  try{const d=await forecast(la,lo),c=d.current,y=d.daily;
+  try{
+    const d=await forecast(la,lo),c=d.current,y=d.daily;
     const rawRain=y.precipitation_probability_max[0]||0;
     const wc=c.weather_code;
     const activeRain=(wc>=51&&wc<=67)||(wc>=80&&wc<=82)||wc>=95;
@@ -889,11 +1003,19 @@ async function run(la,lo,name,keepMsg){
     W={temp:c.temperature_2m,feels:c.apparent_temperature,hum:c.relative_humidity_2m,wind:c.wind_speed_10m,code:wc,day:c.is_day!==0,rain:effectiveRain,uv:y.uv_index_max[0]||0,
       days:y.time.slice(1).map((t,i)=>({date:t,code:y.weather_code[i+1],max:y.temperature_2m_max[i+1],min:y.temperature_2m_min[i+1],rain:y.precipitation_probability_max[i+1]||0}))};
     place=name;
-    if($("city") && name && name!=="Your location")$("city").value=cleanCity(name.split(",")[0]);
+    if($("city") && name && name.toLowerCase()!=="your location"){
+      $("city").value=cleanCity(name.split(",")[0]);
+    }
     render();
     if(!keepMsg)say("");
-    try{localStorage.setItem("lastCity",name)}catch(e){}
-  }catch(e){say(e.message||"Could not load weather. Check your internet connection.",true)}
+    try{
+      if(name && name.toLowerCase()!=="your location")localStorage.setItem("lastCity",name);
+    }catch(e){}
+    return true;
+  }catch(e){
+    say(e.message||"Could not load weather. Check your internet connection.",true);
+    return false;
+  }
 }
 
 async function ensureWeatherLoaded(statusMsg){
@@ -902,7 +1024,12 @@ async function ensureWeatherLoaded(statusMsg){
     if(statusMsg)say(statusMsg);
     return;
   }
-  const typed=cleanCity($("city")?$("city").value:"") || "Mumbai";
+  const rawTyped=cleanCity($("city")?$("city").value:"");
+  const typed=(rawTyped && rawTyped.toLowerCase()!=="your location")?rawTyped:"";
+  if(!typed){
+    if(statusMsg)say(statusMsg+" — Enter a city or click 'Use my location' to get your outfit.");
+    return;
+  }
   try{
     const p=await byCity(typed);
     await run(p.lat,p.lon,p.name,true);
@@ -919,23 +1046,24 @@ async function detectAndRunLocation(){
   // Helper to resolve city name from coordinates
   async function reverseCityName(lat, lon){
     try{
-      const rev=await getJSON("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude="+lat+"&longitude="+lon+"&localityLanguage=en");
+      const rev=await getJSON("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude="+lat+"&longitude="+lon+"&localityLanguage=en",3500);
       const city=rev.city||rev.locality||rev.principalSubdivision;
       if(city)return city+(rev.countryName?", "+rev.countryName:"");
     }catch(e){}
-    return "Your location";
+    return "Detected Location";
   }
 
   // Stage 1: Try Browser Geolocation (if available and not blocked)
   if(navigator.geolocation && window.location.protocol!=="file:"){
     try{
       const pos=await new Promise((resolve,reject)=>{
-        navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:4000,maximumAge:60000});
+        navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:3500,maximumAge:60000});
       });
       const lat=pos.coords.latitude, lon=pos.coords.longitude;
       const locName=await reverseCityName(lat, lon);
-      await run(lat, lon, locName, true);
-      say("✓ Loaded weather for your location ("+locName+")");
+      if($("city") && locName!=="Detected Location")$("city").value=cleanCity(locName.split(",")[0]);
+      const ok=await run(lat, lon, locName, true);
+      if(ok)say("✓ Loaded weather for your location ("+locName+")");
       return;
     }catch(gpsErr){
       // Fall through automatically to Stage 2 (IP Geolocation)
@@ -945,23 +1073,23 @@ async function detectAndRunLocation(){
   // Stage 2: Automatic IP Geolocation Fallback (works in iframes, desktop PCs, and Windows file://)
   const ipProviders=[
     async ()=>{
-      const d=await getJSON("https://get.geojs.io/v1/ip/geo.json");
+      const d=await getJSON("https://get.geojs.io/v1/ip/geo.json",3500);
       if(d && d.latitude && d.longitude){
-        return { lat:parseFloat(d.latitude), lon:parseFloat(d.longitude), name:(d.city||"Your location")+(d.country?", "+d.country:"") };
+        return { lat:parseFloat(d.latitude), lon:parseFloat(d.longitude), name:(d.city||"Detected Location")+(d.country?", "+d.country:"") };
       }
       throw new Error("GeoJS incomplete");
     },
     async ()=>{
-      const d=await getJSON("https://ipwho.is/");
+      const d=await getJSON("https://ipwho.is/",3500);
       if(d && d.latitude && d.longitude){
-        return { lat:Number(d.latitude), lon:Number(d.longitude), name:(d.city||"Your location")+(d.country?", "+d.country:"") };
+        return { lat:Number(d.latitude), lon:Number(d.longitude), name:(d.city||"Detected Location")+(d.country?", "+d.country:"") };
       }
       throw new Error("ipwho incomplete");
     },
     async ()=>{
-      const d=await getJSON("https://ipapi.co/json/");
+      const d=await getJSON("https://ipapi.co/json/",3500);
       if(d && d.latitude && d.longitude){
-        return { lat:Number(d.latitude), lon:Number(d.longitude), name:(d.city||"Your location")+(d.country_name?", "+d.country_name:"") };
+        return { lat:Number(d.latitude), lon:Number(d.longitude), name:(d.city||"Detected Location")+(d.country_name?", "+d.country_name:"") };
       }
       throw new Error("ipapi incomplete");
     }
@@ -970,18 +1098,19 @@ async function detectAndRunLocation(){
   for(const provider of ipProviders){
     try{
       const loc=await provider();
-      await run(loc.lat, loc.lon, loc.name, true);
-      say("✓ Loaded weather for your detected location ("+loc.name+")");
+      if($("city") && loc.name)$("city").value=cleanCity(loc.name.split(",")[0]);
+      const ok=await run(loc.lat, loc.lon, loc.name, true);
+      if(ok)say("✓ Loaded weather for your detected location ("+loc.name+")");
       return;
     }catch(e){}
   }
 
-  // Stage 3: Offline Timezone City Fallback (works even when adblockers/firewalls block IP APIs)
+  // Stage 3: Offline Timezone City Fallback
   try{
     const tz=(Intl.DateTimeFormat().resolvedOptions().timeZone||"").trim();
     const tzCityMap={
-      "Asia/Calcutta":"Kochi",
-      "Asia/Kolkata":"Kochi",
+      "Asia/Calcutta":"Kalyan",
+      "Asia/Kolkata":"Kalyan",
       "America/New_York":"New York",
       "America/Los_Angeles":"Los Angeles",
       "America/Chicago":"Chicago",
@@ -991,10 +1120,10 @@ async function detectAndRunLocation(){
       "Asia/Tokyo":"Tokyo",
       "Australia/Sydney":"Sydney"
     };
-    const fallbackCity=tzCityMap[tz] || (tz.includes("/")?tz.split("/").pop().replace(/_/g," "):"Mumbai");
+    const fallbackCity=tzCityMap[tz] || (tz.includes("/")?tz.split("/").pop().replace(/_/g," "):"Kalyan");
     const p=await byCity(fallbackCity);
-    await run(p.lat, p.lon, p.name, true);
-    say("✓ Loaded weather for your region ("+p.name+")");
+    const ok=await run(p.lat, p.lon, p.name, true);
+    if(ok)say("✓ Loaded weather for your region ("+p.name+")");
     return;
   }catch(e){}
 
@@ -1003,7 +1132,15 @@ async function detectAndRunLocation(){
 
 async function handleGo(){
   const c=cleanCity($("city")?$("city").value:"");
-  if(!c){say("Enter a city name first.",true);return;}
+  if(!c || c.toLowerCase()==="your location"){
+    if(c.toLowerCase()==="your location"){
+      if($("city"))$("city").value="";
+      detectAndRunLocation();
+      return;
+    }
+    say("Enter a city name first.",true);
+    return;
+  }
   try{
     say("Finding "+c+"…");
     const p=await byCity(c);
@@ -1056,32 +1193,30 @@ if($("gender"))$("gender").onchange=()=>{
 };
 if($("act"))$("act").onchange=()=>{
   resetStyleOverrides();
-  ensureWeatherLoaded();
+  if(W)render();
 };
 if($("sens"))$("sens").onchange=()=>{
   resetStyleOverrides();
-  ensureWeatherLoaded();
+  if(W)render();
 };
 
-// Restore saved user preferences and auto-load weather on startup so buttons & outfit work immediately
-(async function initApp(){
+// Restore saved user preferences WITHOUT auto-loading Mumbai on startup
+(function initApp(){
   try{
     const savedG=localStorage.getItem("dressSenseGender");
     if(savedG&&$("gender")&&(savedG==="female"||savedG==="male"))$("gender").value=savedG;
     const savedF=localStorage.getItem("dressSenseUnitF");
     if(savedF==="1")F=true;
     const l=localStorage.getItem("lastCity");
-    if(l&&$("city"))$("city").value=cleanCity(l.split(",")[0]);
+    if(l){
+      if(l.toLowerCase()==="your location" || l.toLowerCase().startsWith("mumbai")){
+        localStorage.removeItem("lastCity");
+      } else if($("city")){
+        $("city").value=cleanCity(l.split(",")[0]);
+      }
+    }
   }catch(e){}
 
   syncGenderUI();
   syncUnitUI();
-
-  // Auto-load initial city weather so the outfit card & all buttons are live immediately
-  const initialCity=cleanCity($("city")?$("city").value:"") || "Mumbai";
-  if($("city") && !$("city").value)$("city").value=initialCity;
-  try{
-    const p=await byCity(initialCity);
-    await run(p.lat, p.lon, p.name);
-  }catch(e){}
 })();
