@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Dress Sense: an explainable AI weather advisor that tells you what to wear today.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src https://api.open-meteo.com https://geocoding-api.open-meteo.com; style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' file:; img-src 'self' data: https://images.unsplash.com https:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; connect-src https://api.open-meteo.com https://geocoding-api.open-meteo.com https://get.geojs.io https://ipwho.is https://ipapi.co https://api.bigdatacloud.net; style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' file:; img-src 'self' file: data: https://images.unsplash.com https:;">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%A4%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <title>Dress Sense – AI Weather Advisor</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <header><div class="w"><nav><a class="brand" href="#advisor"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h2a1 1 0 0 0 2 0h2l1 3-2.5 1.5L15 20H9l1.5-12.5L8 6Z"/><path d="M5 8 2 9.5 3.5 13 6 12"/><path d="M19 8l3 1.5L20.5 13 18 12"/></svg></span><b>Dress Sense</b></a><div><a href="#advisor">Advisor</a><a href="#how">How it works</a><a href="#rules">Rules</a><a href="#security">Security</a><a href="#about">About</a><a href="#faq">FAQ</a></div></nav></div></header>
@@ -21,9 +21,9 @@
   <div><label for="gender">Gender</label><select id="gender"><option value="male">Male</option><option value="female">Female</option></select></div>
   <div><label for="act">Today I'm going for</label><select id="act"><option value="casual">College / casual</option><option value="office">Office / formal</option><option value="workout">Workout / sports</option><option value="travel">Travel / long commute</option></select></div>
   <div><label for="sens">I usually feel</label><select id="sens"><option value="0">Normal</option><option value="-5">Cold easily</option><option value="5">Hot easily</option></select></div>
-  <button id="go">Get advice</button>
+  <button id="go" type="button">Get advice</button>
 </div>
-<div class="row2"><button class="alt" id="loc">Use my location</button><button class="alt" id="unit">Switch to °F</button><button class="alt" id="genderToggle">Gender: Male 👨</button><button class="alt" id="vibeToggle">Vibe: Gen Z 😎</button></div>
+<div class="row2"><button class="alt" id="loc" type="button">📍 Use my location</button><button class="alt" id="unit" type="button">🌡️ Unit: °C (Switch to °F)</button><button class="alt" id="genderToggle" type="button">Gender: Male 👨</button></div>
 <div id="status" role="status" aria-live="polite"></div>
 <div id="out" class="hide">
   <div class="grid">
@@ -40,7 +40,7 @@
       <div class="tag-header">
         <h3 id="fitTitle">Wear this today</h3>
         <div class="fit-controls">
-          <button class="shuffle-btn" id="shuffleFitBtn" title="Shuffle outfit style variations">
+          <button class="shuffle-btn" id="shuffleFitBtn" type="button" title="Shuffle outfit style variations">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
             <span>Shuffle Styles 🔀</span>
           </button>
@@ -116,13 +116,12 @@
 <details><summary>Where does the weather data come from?</summary><p>Open-Meteo, a free open weather service that needs no API key.</p></details>
 <details><summary>Does the site store my location?</summary><p>No. Your coordinates are used only to request the forecast. The last city name is kept in your own browser.</p></details>
 <details><summary>Why does "Use my location" not work?</summary><p>Browsers may block location on files opened directly. Run a local server (python -m http.server 8000) or host the site on HTTPS, such as GitHub Pages.</p></details>
-<details><summary>What is the difference between Gen Z Mode and Classic Plain Mode?</summary><p>Gen Z Mode recommends trendy streetwear aesthetics (oversized graphic tees, baggy relaxed denim, chunky kicks, boxy fleece hoodies) with youth-culture vibe captions. Classic Plain Mode recommends timeless staples (clean oxford button-downs, tailored chinos, classic sneakers, cable-knit sweaters) with objective stylist guidance.</p></details>
 <details><summary>How is the Outdoor Weather Comfort Score calculated?</summary><p>It starts at 100 and deducts 3 points for every degree away from 22°C (the physiological thermal baseline), plus penalties for heavy rain (15 pts), extreme UV (8 pts), and harsh winds (10 pts). A lower score indicates severe ambient weather rather than inadequate clothing.</p></details>
 </div></section>
 
 <footer><div class="w">Dress Sense · College project · Weather data by Open-Meteo</div></footer>
 
-<script src="/js/engine.js"></script>
-<script src="/js/app.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

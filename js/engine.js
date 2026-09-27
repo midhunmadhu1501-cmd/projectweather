@@ -464,6 +464,32 @@ function recommend(w,act,bias,fmt,isGenZ=true,gender="male"){
     }
   }
 
+  // Detect active precipitation from weather_code as well as forecast probability
+  const isStorm = w.code>=95;
+  const isHeavyRainCode = (w.code>=63 && w.code<=67) || (w.code>=81 && w.code<=82) || isStorm;
+  const isRainCode = (w.code>=51 && w.code<=67) || (w.code>=80 && w.code<=82) || isStorm;
+  const isSnowCode = (w.code>=71 && w.code<=77) || w.code===85 || w.code===86;
+  const [condLabel] = wx(w.code);
+
+  // Wet / snowy footwear protection: avoid open sandals in rain, and use boots in cool/cold rain or snow
+  if((isRainCode || w.rain>=50) && act!=="workout"){
+    if(shoes==="sandals"){
+      shoes="sneakers";
+      why.push("Wet weather adjustment: swapped open sandals for closed-toe sneakers to keep feet dry and prevent slipping.");
+    } else if(shoes==="f_sandals_flats"){
+      shoes="f_sneakers";
+      why.push("Wet weather adjustment: swapped open sandals for closed-toe sneakers to keep feet dry in the rain.");
+    } else if(f<16 && (act==="casual" || act==="travel")){
+      if(!isFem && shoes==="sneakers"){
+        shoes="boots";
+        why.push("Cold & wet conditions: upgraded footwear to weather-resistant leather boots for warmth and puddle protection.");
+      } else if(isFem && shoes==="f_sneakers"){
+        shoes="f_ankle_boots";
+        why.push("Cold & wet conditions: upgraded footwear to ankle boots for warmth and wet-pavement protection.");
+      }
+    }
+  }
+
   // Explain primary selection
   if(isGenZ){
     why.push(`Effective temperature is ${fmt(f)} (ambient feels-like ${fmt(w.feels)}): matched with ${PIECES[top].vibe} + ${PIECES[bottom].vibe}.`);
@@ -471,32 +497,55 @@ function recommend(w,act,bias,fmt,isGenZ=true,gender="male"){
     why.push(`Effective temperature is ${fmt(f)} (ambient feels-like ${fmt(w.feels)}): recommends a ${PLAIN_NAMES[top]||"top"} paired with ${PLAIN_NAMES[bottom]||"bottom"}.`);
   }
 
-  // Weather-specific add-ons
-  if(w.rain>=60){
-    acc.push("umbrella","raincoat");
-    vibe += isGenZ ? " + rain-proofed 🌧️" : " (Rain Protection Included)";
-    why.push(isGenZ ? "Rain chance is "+w.rain+"%: full water defense added." : "Precipitation probability is "+w.rain+"%: waterproof raincoat and umbrella are strongly recommended.");
-  } else if(w.rain>=30){
-    acc.push("umbrella");
-    why.push(isGenZ ? "Rain chance is "+w.rain+"%: pack an umbrella just in case." : "Precipitation probability is "+w.rain+"%: carrying a compact umbrella is advised.");
-  }
-  if(w.uv>=6){
-    acc.push("sunglasses","cap","sunscreen");
-    why.push(isGenZ ? "UV index peaks at "+Math.round(w.uv)+": sun shield mandatory (sunglasses, cap, SPF)." : "UV index reaches "+Math.round(w.uv)+": UV protection (SPF sunscreen, sunglasses, and cap) is necessary.");
-  }
-  if(w.wind>=30){
-    acc.push("windbreaker");
-    why.push(isGenZ ? "Wind is "+Math.round(w.wind)+" km/h: windbreaker prevents wind chill." : "Wind speed is "+Math.round(w.wind)+" km/h: windbreaker layer reduces convective heat loss.");
-  }
-  if(w.hum>=75&&f>=26){
-    why.push(isGenZ ? "High humidity ("+w.hum+"%): stick to loose, breathable cotton or linen." : "High relative humidity ("+w.hum+"%): lightweight natural fabrics such as cotton or linen facilitate evaporative cooling.");
-  }
-  if(w.code>=95){
-    why.push(isGenZ ? "Thunderstorm alert: stay indoors and off open grounds." : "Severe thunderstorm warning: minimize outdoor exposure during active lightning.");
+  // Weather-specific add-ons (Rain, Drizzle, Snow, UV, Wind, Humidity)
+  if(w.rain>=60 || isHeavyRainCode){
+    acc.unshift("umbrella","raincoat");
+    vibe += isGenZ ? " + rain-proofed 🌧️" : " (Umbrella & Raincoat Included ☔)";
+    const reasonPrefix = isRainCode ? `Active ${condLabel.toLowerCase()} (${w.rain}% rain chance)` : `High precipitation probability (${w.rain}%)`;
+    why.push(`${reasonPrefix}: both a compact umbrella and a waterproof raincoat are included.`);
+  } else if(w.rain>=25 || isRainCode){
+    if(w.wind>=25){
+      acc.unshift("umbrella","raincoat");
+      vibe += isGenZ ? " + rain & wind shield ☔" : " (Umbrella & Raincoat Included ☔)";
+      why.push(`${isRainCode ? "Active "+condLabel.toLowerCase() : "Rain chance of "+w.rain+"%"} with ${Math.round(w.wind)} km/h wind: added both an umbrella and a waterproof raincoat.`);
+    } else {
+      acc.unshift("umbrella");
+      vibe += isGenZ ? " + umbrella packed ☂️" : " (Umbrella Included ☂️)";
+      why.push(`${isRainCode ? "Active "+condLabel.toLowerCase()+" outdoors" : "Precipitation probability is "+w.rain+"%"}: carrying a compact umbrella is recommended.`);
+    }
   }
 
-  // Raw outdoor weather comfort score (based on raw ambient w.feels)
-  let s=100-Math.abs(w.feels-22)*3-(w.rain>=60?15:0)-(w.uv>=8?8:0)-(w.wind>=40?10:0);
+  if(isSnowCode){
+    if(!acc.includes("beanie"))acc.push("beanie");
+    if(!acc.includes("gloves"))acc.push("gloves");
+    if(!acc.includes("scarf"))acc.push("scarf");
+    if(!acc.includes("umbrella") && w.feels>=-2)acc.unshift("umbrella");
+    why.push(`Active ${condLabel.toLowerCase()} conditions: thermal winter accessories (beanie, gloves, and wool scarf) are included for snow protection.`);
+  }
+
+  if(w.uv>=6){
+    acc.push("sunglasses","cap","sunscreen");
+    why.push("UV index reaches "+Math.round(w.uv)+": full sun protection (UV sunglasses, baseball cap, and SPF 50+ sunscreen) is included.");
+  } else if(w.uv>=3 && w.day && w.code<=2 && !isRainCode){
+    acc.push("sunglasses");
+    why.push("Sunny daytime conditions (UV "+Math.round(w.uv)+"): UV-protective sunglasses added for glare and eye comfort.");
+  }
+
+  if(w.wind>=30 || (w.wind>=22 && f<14)){
+    acc.push("windbreaker");
+    why.push("Wind speed is "+Math.round(w.wind)+" km/h: windbreaker shell added to block wind chill and convective heat loss.");
+  }
+
+  if(w.hum>=75&&f>=26){
+    why.push("High relative humidity ("+w.hum+"%): lightweight breathable fabrics facilitate evaporative cooling.");
+  }
+  if(isStorm){
+    why.push("Severe thunderstorm alert: minimize outdoor exposure during active lightning.");
+  }
+
+  // Raw outdoor weather comfort score (based on raw ambient w.feels + active rain/snow/wind/UV)
+  const rainPenalty = (w.rain>=60 || isHeavyRainCode) ? 15 : ((w.rain>=25 || isRainCode || isSnowCode) ? 8 : 0);
+  let s=100-Math.abs(w.feels-22)*3-rainPenalty-(w.uv>=8?8:0)-(w.wind>=40?10:(w.wind>=28?5:0));
   // Variant offset based on "I usually feel" sensitivity so photos shift when user toggles Normal / Cold easily / Hot easily
   const sensVariantShift = bias < 0 ? 1 : (bias > 0 ? 2 : 0);
 

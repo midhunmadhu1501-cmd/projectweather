@@ -444,6 +444,36 @@ const selectedVariantsGenZ={};
 const selectedVariantsPlain={};
 let currentSensShift=0;
 
+// Cross-environment image path resolver (works on Vite, Node server, python http.server, AND direct Windows file://)
+function resolveImgPath(src){
+  if(!src)return "";
+  const clean=src.replace(/^\//,"");
+  if(typeof window!=="undefined" && window.location && window.location.protocol==="file:"){
+    return clean.startsWith("public/") ? clean : ("public/"+clean);
+  }
+  return clean;
+}
+
+function setImgWithFallback(imgEl, rawSrc){
+  const primary=resolveImgPath(rawSrc);
+  const clean=rawSrc.replace(/^\//,"");
+  const fallbacks=[
+    "public/"+clean,
+    "/"+clean,
+    clean
+  ];
+  let fbIdx=0;
+  imgEl.onerror=()=>{
+    while(fbIdx<fallbacks.length && fallbacks[fbIdx]===imgEl.getAttribute("src")){
+      fbIdx++;
+    }
+    if(fbIdx<fallbacks.length){
+      imgEl.src=fallbacks[fbIdx++];
+    }
+  };
+  imgEl.src=primary;
+}
+
 function getVariant(key){
   const data=CLOTHING_VARIANTS[key];
   if(!data)return null;
@@ -458,11 +488,13 @@ function getVariant(key){
 
   return{
     ...item,
+    src: resolveImgPath(item.src),
+    rawSrc: item.src,
     title: genZ ? item.genzTitle : item.plainTitle,
     style: genZ ? item.genzStyle : item.plainStyle,
     index: idx,
     total: list.length,
-    all: list
+    all: list.map(it=>({...it, src:resolveImgPath(it.src), rawSrc:it.src}))
   };
 }
 function cycleVariant(key, delta=1){
@@ -586,29 +618,38 @@ function svgIcon(key){
   return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+d+'"/></svg>';
 }
 
-let genZ=true;
+const genZ=false;
+
+function resetStyleOverrides(){
+  Object.keys(selectedVariantsGenZ).forEach(k=>delete selectedVariantsGenZ[k]);
+  Object.keys(selectedVariantsPlain).forEach(k=>delete selectedVariantsPlain[k]);
+}
 
 function row(k,v,iconKey){
   const d=document.createElement("div");d.className="item";
   const a=document.createElement("span");a.textContent=k;
   const b=document.createElement("span");b.className="ival";
 
-  const variant=iconKey?getVariant(iconKey):null;
-  if(variant){
-    const im=document.createElement("img");
-    im.className="cloth-img";
-    im.src=variant.src;
-    im.alt=variant.title;
-    im.loading="lazy";
-    im.title="Click to view style details & alternatives";
-    im.onclick=()=>showPreview(iconKey, v);
-    b.append(im);
-  } else if(iconKey){
-    const ic=document.createElement("span");
-    ic.className="icn";
-    ic.innerHTML=svgIcon(iconKey);
-    b.append(ic);
-  }
+  const keys=Array.isArray(iconKey)?iconKey:(iconKey?[iconKey]:[]);
+  keys.forEach(key=>{
+    const variant=getVariant(key);
+    const itemLabel=PLAIN_ACC[key]||PLAIN_TOP[key]||PLAIN_BOTTOM[key]||PLAIN_SHOES[key]||v;
+    if(variant){
+      const im=document.createElement("img");
+      im.className="cloth-img";
+      setImgWithFallback(im, variant.rawSrc||variant.src);
+      im.alt=variant.title;
+      im.loading="lazy";
+      im.title="Click to view "+itemLabel;
+      im.onclick=()=>showPreview(key, itemLabel);
+      b.append(im);
+    } else {
+      const ic=document.createElement("span");
+      ic.className="icn";
+      ic.innerHTML=svgIcon(key);
+      b.append(ic);
+    }
+  });
 
   const t=document.createElement("span");t.textContent=v;b.append(t);
   d.append(a,b);return d;
@@ -629,12 +670,12 @@ function showPreview(key, label){
 
   const variantsHtml=cur.total>1?`
     <div class="pop-variants">
-      <span class="lbl">${genZ?"Aesthetic Variations":"Style Options"} (${cur.total} available · tap to switch):</span>
+      <span class="lbl">Style Options (${cur.total} available · tap to switch):</span>
       <div class="pop-var-list">
         ${cur.all.map((item,idx)=>`
           <div class="pop-var-item ${idx===cur.index?'active':''}" onclick="setVariant('${key}',${idx})">
-            <img src="${item.src}" alt="${genZ?item.genzTitle:item.plainTitle}">
-            <span>${genZ?item.genzStyle:item.plainStyle}</span>
+            <img src="${item.src}" alt="${item.plainTitle}">
+            <span>${item.plainStyle}</span>
           </div>
         `).join('')}
       </div>
@@ -657,7 +698,7 @@ function setVariant(key,idx){
   const store=genZ?selectedVariantsGenZ:selectedVariantsPlain;
   store[key]=idx;
   render();
-  showPreview(key, (genZ?PIECES[key].vibe:PLAIN_TOP[key]||PLAIN_BOTTOM[key]||PLAIN_SHOES[key]||PLAIN_ACC[key]||key));
+  showPreview(key, (PLAIN_TOP[key]||PLAIN_BOTTOM[key]||PLAIN_SHOES[key]||PLAIN_ACC[key]||key));
 }
 
 function syncGenderUI(){
@@ -671,6 +712,15 @@ function syncGenderUI(){
   try{localStorage.setItem("dressSenseGender",g)}catch(e){}
 }
 
+function syncUnitUI(){
+  const uBtn=$("unit");
+  if(uBtn){
+    uBtn.textContent=F?"🌡️ Unit: °F (Switch to °C)":"🌡️ Unit: °C (Switch to °F)";
+    uBtn.className="alt "+(F?"active-unit-f":"active-unit-c");
+  }
+  try{localStorage.setItem("dressSenseUnitF",F?"1":"0")}catch(e){}
+}
+
 function setSky(){
   const c=W.code;let k="clear";
   if(c>=95)k="storm";else if((c>=71&&c<=77)||c===85||c===86)k="snow";
@@ -680,11 +730,7 @@ function setSky(){
 
 function render(){
   syncGenderUI();
-  const vt=$("vibeToggle");
-  if(vt){
-    vt.textContent=genZ?"Vibe: Gen Z 😎":"Mode: Classic Plain 📝";
-    vt.className="alt "+(genZ?"active-genz":"active-plain");
-  }
+  syncUnitUI();
   if(!W)return;setSky();const[l,i]=wx(W.code);
   $("place").textContent=place;$("temp").textContent=deg(W.temp);$("cond").textContent=i+" "+l+" · feels like "+deg(W.feels);
   const st=$("stats");st.textContent="";
@@ -693,32 +739,28 @@ function render(){
   const gender=$("gender")?$("gender").value:"male";
   const isFem=(gender==="female");
   const bias=parseInt($("sens").value,10)||0;
-  const r=recommend(W,$("act").value,bias,deg,genZ,gender);
+  const r=recommend(W,$("act").value,bias,deg,false,gender);
   currentSensShift=r.sensVariantShift||0;
 
   const o=$("outfit");o.textContent="";
-  const topTxt=genZ?PIECES[r.top].vibe:PLAIN_TOP[r.top];
-  const bottomTxt=genZ?PIECES[r.bottom].vibe:PLAIN_BOTTOM[r.bottom];
-  const shoesTxt=genZ?PIECES[r.shoes].vibe:PLAIN_SHOES[r.shoes];
-  const accTxt=r.acc.length?r.acc.map(k=>genZ?PIECES[k].vibe:PLAIN_ACC[k]).join(", "):(genZ?"nothing extra, you're set":"None required");
+  const topTxt=PLAIN_TOP[r.top];
+  const bottomTxt=PLAIN_BOTTOM[r.bottom];
+  const shoesTxt=PLAIN_SHOES[r.shoes];
+  const accTxt=r.acc.length?r.acc.map(k=>PLAIN_ACC[k]).join(", "):"None required";
 
-  // Dynamic header titles based on mode & gender
+  // Dynamic header titles based on gender
   const ft=$("fitTitle");
   if(ft){
-    if(genZ){
-      ft.textContent=isFem?"Female Fit Check 🔥":"Male Fit Check 🔥";
-    } else {
-      ft.textContent=isFem?"Female Recommended Outfit 👗":"Male Recommended Outfit 👔";
-    }
+    ft.textContent=isFem?"Female Recommended Outfit 👗":"Male Recommended Outfit 👔";
   }
-  const wt=$("whyTitle");if(wt)wt.textContent=genZ?"Why this fit hits 💡":"Weather & Styling Rationale 📋";
-  const shf=$("shuffleFitBtn");if(shf){shf.onclick=shuffleOutfit;shf.title=genZ?"Shuffle aesthetic variations":"Shuffle style options";}
+  const wt=$("whyTitle");if(wt)wt.textContent="Weather & Styling Rationale 📋";
+  const shf=$("shuffleFitBtn");if(shf){shf.onclick=shuffleOutfit;shf.title="Shuffle style options";}
 
-  // Stylist / Vibe banner
+  // Stylist banner
   const vb=$("vibe");
   if(vb){
-    vb.className="vibe "+(genZ?"genz":"plain");
-    vb.innerHTML=genZ?`<span class="vibe-tag-lbl">${isFem?"Female Vibe":"Male Vibe"}</span>${r.vibe}`:`<span class="vibe-tag-lbl">${isFem?"Female Stylist":"Male Stylist"}</span>${r.vibe}`;
+    vb.className="vibe plain";
+    vb.innerHTML=`<span class="vibe-tag-lbl">${isFem?"Female Stylist":"Male Stylist"}</span>${r.vibe}`;
     vb.classList.remove("hide");
   }
 
@@ -727,10 +769,14 @@ function render(){
   gallery.className="outfit-gallery";
 
   const cards=[
-    { role:genZ?"Top Piece":"Top", key:r.top, label:topTxt },
-    { role:genZ?"Bottoms":"Bottom", key:r.bottom, label:bottomTxt },
-    { role:genZ?"Kicks":"Footwear", key:r.shoes, label:shoesTxt },
-    ...(r.acc.length ? [{ role:genZ?"Accessories":"Accessories", key:r.acc[0], label:r.acc.map(k=>genZ?PIECES[k].vibe:PLAIN_ACC[k])[0] }] : [])
+    { role:"Top", key:r.top, label:topTxt },
+    { role:"Bottom", key:r.bottom, label:bottomTxt },
+    { role:"Footwear", key:r.shoes, label:shoesTxt },
+    ...r.acc.map((accKey, idx)=>({
+      role: r.acc.length>1 ? ("Weather Gear "+(idx+1)) : "Accessories",
+      key: accKey,
+      label: PLAIN_ACC[accKey]||accKey
+    }))
   ];
 
   cards.forEach(c=>{
@@ -748,7 +794,7 @@ function render(){
       wrap.onclick=()=>showPreview(c.key, c.label);
 
       const img=document.createElement("img");
-      img.src=v.src;
+      setImgWithFallback(img, v.rawSrc||v.src);
       img.alt=v.title;
       img.loading="lazy";
       wrap.append(img);
@@ -794,20 +840,22 @@ function render(){
   });
 
   o.append(gallery);
-  o.append(row(genZ?"Top Piece":"Top",topTxt,r.top),row(genZ?"Bottoms":"Bottom",bottomTxt,r.bottom),row(genZ?"Kicks":"Footwear",shoesTxt,r.shoes),row(genZ?"Carry":"Carry",accTxt,r.acc[0]||null));
+  o.append(row("Top",topTxt,r.top),row("Bottom",bottomTxt,r.bottom),row("Footwear",shoesTxt,r.shoes),row("Carry",accTxt,r.acc));
   const ul=$("why");ul.textContent="";r.why.forEach(t=>{const li=document.createElement("li");li.textContent=t;ul.append(li)});
   $("bar").style.width=r.score+"%";$("sc").textContent=r.score+"/100";
   const sub=$("scoreSub");
   if(sub){
     if(r.score>=80){
       sub.textContent="Mild & pleasant outdoor climate. Very easy to stay comfortable.";
+    } else if(W.feels<=12 && W.rain>=25){
+      sub.textContent="Cold & wet outdoor weather. This outfit combines warm insulation with rain protection.";
     } else if(r.score>=60){
       sub.textContent="Moderate outdoor conditions. Outfit is calibrated for balanced comfort.";
     } else if(W.feels>=28){
       sub.textContent="High heat/humidity outdoors. This outfit is chosen to maximize ventilation and keep you cool.";
     } else if(W.feels<=10){
       sub.textContent="Cold outdoor weather. This outfit layers insulation to keep you warm.";
-    } else if(W.rain>=40){
+    } else if(W.rain>=30){
       sub.textContent="Wet/rainy conditions outdoors. Weather protection included to keep you dry.";
     } else {
       sub.textContent="Challenging outdoor weather. Outfit is specifically selected to protect you.";
@@ -818,39 +866,163 @@ function render(){
   $("out").classList.remove("hide");
 }
 
-async function run(la,lo,name){
-  say("Fetching weather…");
+async function run(la,lo,name,keepMsg){
+  if(!keepMsg)say("Fetching weather for "+name+"…");
   try{const d=await forecast(la,lo),c=d.current,y=d.daily;
-    W={temp:c.temperature_2m,feels:c.apparent_temperature,hum:c.relative_humidity_2m,wind:c.wind_speed_10m,code:c.weather_code,day:c.is_day!==0,rain:y.precipitation_probability_max[0]||0,uv:y.uv_index_max[0]||0,
+    const rawRain=y.precipitation_probability_max[0]||0;
+    const wc=c.weather_code;
+    const activeRain=(wc>=51&&wc<=67)||(wc>=80&&wc<=82)||wc>=95;
+    const heavyRain=(wc>=63&&wc<=67)||(wc>=81&&wc<=82)||wc>=95;
+    const effectiveRain=activeRain?Math.max(rawRain,heavyRain?80:60):rawRain;
+    W={temp:c.temperature_2m,feels:c.apparent_temperature,hum:c.relative_humidity_2m,wind:c.wind_speed_10m,code:wc,day:c.is_day!==0,rain:effectiveRain,uv:y.uv_index_max[0]||0,
       days:y.time.slice(1).map((t,i)=>({date:t,code:y.weather_code[i+1],max:y.temperature_2m_max[i+1],min:y.temperature_2m_min[i+1],rain:y.precipitation_probability_max[i+1]||0}))};
-    place=name;render();say("");try{localStorage.setItem("lastCity",name)}catch(e){}
+    place=name;
+    if($("city") && name && name!=="Your location")$("city").value=cleanCity(name.split(",")[0]);
+    render();
+    if(!keepMsg)say("");
+    try{localStorage.setItem("lastCity",name)}catch(e){}
   }catch(e){say(e.message||"Could not load weather. Check your internet connection.",true)}
 }
+
+async function ensureWeatherLoaded(statusMsg){
+  if(W){
+    render();
+    if(statusMsg)say(statusMsg);
+    return;
+  }
+  const typed=cleanCity($("city")?$("city").value:"") || "Mumbai";
+  try{
+    const p=await byCity(typed);
+    await run(p.lat,p.lon,p.name,true);
+    if(statusMsg)say(statusMsg);
+  }catch(e){
+    if(statusMsg)say(statusMsg);
+  }
+}
+
+// Multi-stage Location Detector: tries Browser GPS first, then automatically falls back to IP Geolocation
+async function detectAndRunLocation(){
+  say("📍 Detecting your location…");
+
+  // Helper to resolve city name from coordinates
+  async function reverseCityName(lat, lon){
+    try{
+      const rev=await getJSON("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude="+lat+"&longitude="+lon+"&localityLanguage=en");
+      const city=rev.city||rev.locality||rev.principalSubdivision;
+      if(city)return city+(rev.countryName?", "+rev.countryName:"");
+    }catch(e){}
+    return "Your location";
+  }
+
+  // Stage 1: Try Browser Geolocation (if available and not blocked)
+  if(navigator.geolocation && window.location.protocol!=="file:"){
+    try{
+      const pos=await new Promise((resolve,reject)=>{
+        navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:4000,maximumAge:60000});
+      });
+      const lat=pos.coords.latitude, lon=pos.coords.longitude;
+      const locName=await reverseCityName(lat, lon);
+      await run(lat, lon, locName, true);
+      say("✓ Loaded weather for your location ("+locName+")");
+      return;
+    }catch(gpsErr){
+      // Fall through automatically to Stage 2 (IP Geolocation)
+    }
+  }
+
+  // Stage 2: Automatic IP Geolocation Fallback (works in iframes, desktop PCs, and Windows file://)
+  const ipProviders=[
+    async ()=>{
+      const d=await getJSON("https://get.geojs.io/v1/ip/geo.json");
+      if(d && d.latitude && d.longitude){
+        return { lat:parseFloat(d.latitude), lon:parseFloat(d.longitude), name:(d.city||"Your location")+(d.country?", "+d.country:"") };
+      }
+      throw new Error("GeoJS incomplete");
+    },
+    async ()=>{
+      const d=await getJSON("https://ipwho.is/");
+      if(d && d.latitude && d.longitude){
+        return { lat:Number(d.latitude), lon:Number(d.longitude), name:(d.city||"Your location")+(d.country?", "+d.country:"") };
+      }
+      throw new Error("ipwho incomplete");
+    },
+    async ()=>{
+      const d=await getJSON("https://ipapi.co/json/");
+      if(d && d.latitude && d.longitude){
+        return { lat:Number(d.latitude), lon:Number(d.longitude), name:(d.city||"Your location")+(d.country_name?", "+d.country_name:"") };
+      }
+      throw new Error("ipapi incomplete");
+    }
+  ];
+
+  for(const provider of ipProviders){
+    try{
+      const loc=await provider();
+      await run(loc.lat, loc.lon, loc.name, true);
+      say("✓ Loaded weather for your detected location ("+loc.name+")");
+      return;
+    }catch(e){}
+  }
+
+  say("Could not auto-detect location. Please type your city name above and click Get advice.",true);
+}
+
 $("go").onclick=async()=>{const c=cleanCity($("city").value);if(!c){say("Enter a city name first.",true);return}
   try{say("Finding "+c+"…");const p=await byCity(c);await run(p.lat,p.lon,p.name)}catch(e){say(e.message,true)}};
 $("city").addEventListener("keydown",e=>{if(e.key==="Enter")$("go").click()});
-$("loc").onclick=()=>{if(!navigator.geolocation){say("Location is not supported in this browser.",true);return}
-  say("Waiting for location permission…");navigator.geolocation.getCurrentPosition(p=>run(p.coords.latitude,p.coords.longitude,"Your location"),()=>say("Location was blocked. Type a city name instead.",true),{timeout:10000})};
-$("unit").onclick=()=>{F=!F;$("unit").textContent=F?"Switch to °C":"Switch to °F";render()};
-$("vibeToggle").onclick=()=>{genZ=!genZ;render()};
+$("loc").onclick=()=>detectAndRunLocation();
+
+$("unit").onclick=()=>{
+  F=!F;
+  syncUnitUI();
+  ensureWeatherLoaded(F?"✓ Switched temperature unit to Fahrenheit (°F)":"✓ Switched temperature unit to Celsius (°C)");
+};
+
 if($("genderToggle")){
   $("genderToggle").onclick=()=>{
     const g=$("gender");
-    if(g){g.value=(g.value==="female"?"male":"female");}
-    render();
+    const nextG=(g && g.value==="female")?"male":"female";
+    if(g)g.value=nextG;
+    syncGenderUI();
+    resetStyleOverrides();
+    ensureWeatherLoaded(nextG==="female"?"✓ Switched to Female Wardrobe 👩":"✓ Switched to Male Wardrobe 👨");
   };
 }
-if($("gender"))$("gender").onchange=render;
-$("act").onchange=render;
-$("sens").onchange=()=>{
-  // Clear manual variant overrides when user changes "I usually feel" so the sensitivity-adapted outfit & variant photos display immediately
-  Object.keys(selectedVariantsGenZ).forEach(k=>delete selectedVariantsGenZ[k]);
-  Object.keys(selectedVariantsPlain).forEach(k=>delete selectedVariantsPlain[k]);
-  render();
-};
-try{
-  const savedG=localStorage.getItem("dressSenseGender");
-  if(savedG&&$("gender")&&(savedG==="female"||savedG==="male"))$("gender").value=savedG;
+if($("gender"))$("gender").onchange=()=>{
   syncGenderUI();
-  const l=localStorage.getItem("lastCity");if(l)$("city").value=cleanCity(l.split(",")[0]);
-}catch(e){}
+  resetStyleOverrides();
+  const isFem=($("gender").value==="female");
+  ensureWeatherLoaded(isFem?"✓ Switched to Female Wardrobe 👩":"✓ Switched to Male Wardrobe 👨");
+};
+$("act").onchange=()=>{
+  resetStyleOverrides();
+  ensureWeatherLoaded();
+};
+$("sens").onchange=()=>{
+  // Reset overrides when user changes "I usually feel" so the sensitivity-adapted outfit & variant photos display immediately
+  resetStyleOverrides();
+  ensureWeatherLoaded();
+};
+
+// Restore saved user preferences and auto-load weather on startup so buttons & outfit work immediately
+(async function initApp(){
+  try{
+    const savedG=localStorage.getItem("dressSenseGender");
+    if(savedG&&$("gender")&&(savedG==="female"||savedG==="male"))$("gender").value=savedG;
+    const savedF=localStorage.getItem("dressSenseUnitF");
+    if(savedF==="1")F=true;
+    const l=localStorage.getItem("lastCity");
+    if(l&&$("city"))$("city").value=cleanCity(l.split(",")[0]);
+  }catch(e){}
+
+  syncGenderUI();
+  syncUnitUI();
+
+  // Auto-load initial city weather so the outfit card & all buttons are live immediately
+  const initialCity=cleanCity($("city")?$("city").value:"") || "Mumbai";
+  if($("city") && !$("city").value)$("city").value=initialCity;
+  try{
+    const p=await byCity(initialCity);
+    await run(p.lat, p.lon, p.name);
+  }catch(e){}
+})();
